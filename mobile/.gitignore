@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# local Capacitor / Android build output (android/.gitignore also covers these)
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+.DS_Store
+Thumbs.db

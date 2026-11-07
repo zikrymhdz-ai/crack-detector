@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#0d1b2a" />
+<title>CrackScan</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e6fff'/%3E%3Cpath d='M16 4l2.6 8.4-4.9 3.6 5.3 5.9-3.6 9' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none">
+        <path d="M16 3l2.4 8.2-4.6 3.4 5 5.6-3.4 8.8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <div class="brand-text">
+      <h1>CrackScan</h1>
+      <p id="connLine">Not connected</p>
+    </div>
+  </div>
+  <button id="btnReconnect" class="conn-chip" type="button">
+    <span class="dot" id="connDot"></span><span id="connChipText">Offline</span>
+  </button>
+</header>
+
+<main id="main">
+
+  <!-- ── SCAN ─────────────────────────────────────────────── -->
+  <section class="screen is-active" id="screen-scan">
+    <div class="viewport" id="viewport">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay"></canvas>
+
+      <div class="hud-top">
+        <span class="hud-pill" id="livePill">STANDBY</span>
+        <span class="hud-pill is-quiet right" id="wallPill" hidden>BRICK WALL</span>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="readout" id="liveReadout">Start the camera to scan a wall</div>
+      </div>
+
+      <div class="cam-placeholder" id="camPlaceholder">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M6 14.5A3.5 3.5 0 019.5 11h5l2.2-3.2A2 2 0 0118.4 7h11.2a2 2 0 011.7.8L33.5 11h5a3.5 3.5 0 013.5 3.5v20A3.5 3.5 0 0138.5 38h-29A3.5 3.5 0 016 34.5v-20z"
+                stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+          <circle cx="24" cy="24" r="7.2" stroke="currentColor" stroke-width="2.2"/>
+        </svg>
+        <p id="camHint">Camera permission is needed to scan walls.</p>
+        <button class="btn btn-ghost" id="btnEnableCam" type="button">Enable camera</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctl" id="btnGallery" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5" stroke="currentColor" stroke-width="1.8"/><circle cx="8.6" cy="9.6" r="1.7" fill="currentColor"/><path d="M4 17l5.2-4.6 3.6 3.1L16.4 12 20 15.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Gallery</span>
+      </button>
+
+      <button class="shutter" id="btnShutter" type="button" aria-label="Scan this wall">
+        <span class="shutter-ring"></span>
+      </button>
+
+      <button class="ctl" id="btnLive" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V10a2 2 0 012-2h2.3l1.5-2.2A1.4 1.4 0 0110.9 5h2.2a1.4 1.4 0 011.1.8L15.7 8H18a2 2 0 012 2v7.5a2 2 0 01-2 2H6a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.3" r="3.4" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span id="liveLabel">Live off</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ── HISTORY ──────────────────────────────────────────── -->
+  <section class="screen" id="screen-history">
+    <div class="screen-head">
+      <div>
+        <h2>Inspection history</h2>
+        <p id="histMeta">Saved scans from this server</p>
+      </div>
+      <button class="btn btn-quiet" id="btnRefreshHist" type="button">Refresh</button>
+    </div>
+    <div class="filters" id="histFilters">
+      <button class="chip is-on" data-filter="" type="button">All</button>
+      <button class="chip" data-filter="new" type="button">New</button>
+      <button class="chip" data-filter="confirmed" type="button">Confirmed</button>
+      <button class="chip" data-filter="repaired" type="button">Repaired</button>
+    </div>
+    <div class="list" id="histList"></div>
+    <div class="empty" id="histEmpty" hidden>
+      <p>No scans yet.</p>
+      <span>Point the camera at a wall and press the shutter.</span>
+    </div>
+  </section>
+
+  <!-- ── SETTINGS ─────────────────────────────────────────── -->
+  <section class="screen" id="screen-settings">
+    <div class="screen-head">
+      <div>
+        <h2>Server</h2>
+        <p>The phone analyses photos on the PC running CrackScan.</p>
+      </div>
+    </div>
+
+    <form class="card" id="serverForm">
+      <label class="field">
+        <span>Server address</span>
+        <input id="serverUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+               placeholder="http://192.168.1.20:5000" />
+      </label>
+      <p class="hint">Use the PC's LAN address (shown when the server starts), not localhost.</p>
+      <div class="row">
+        <button class="btn btn-primary" id="btnSaveServer" type="submit">Save &amp; test</button>
+        <button class="btn btn-quiet" id="btnRescan" type="button">Detect again</button>
+      </div>
+      <p class="status-line" id="serverStatus">Not tested yet</p>
+    </form>
+
+    <div class="card">
+      <h3>Connection</h3>
+      <dl class="kv">
+        <dt>Server</dt><dd id="kvHost">—</dd>
+        <dt>Version</dt><dd id="kvVersion">—</dd>
+        <dt>AI model</dt><dd id="kvModel">—</dd>
+        <dt>Masonry scan</dt><dd id="kvMasonry">—</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h3>How scanning works</h3>
+      <p class="body-text">
+        Every photo is sent to the CrackScan server, which segments the crack, measures
+        its length and width and stores the result in the inspection history. Live mode
+        sends a frame about once a second, so keep the phone and the PC on the same
+        Wi-Fi.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>App</h3>
+      <dl class="kv">
+        <dt>Client</dt><dd>CrackScan Mobile 1.0.0</dd>
+        <dt>Platform</dt><dd id="kvPlatform">—</dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tab is-on" data-screen="scan" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.9"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+    <span>Scan</span>
+  </button>
+  <button class="tab" data-screen="history" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 016.5 5h11A2.5 2.5 0 0120 7.5v9a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 16.5v-9z" stroke="currentColor" stroke-width="1.8"/><path d="M4.4 15.2l4.3-3.8 3 2.6 3.1-2.7 4.6 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>History</span>
+  </button>
+  <button class="tab" data-screen="settings" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.9" stroke="currentColor" stroke-width="1.8"/><path d="M19.3 13.5a7.6 7.6 0 000-3l1.5-1.2-1.7-3-1.9.7a7.6 7.6 0 00-2.6-1.5L14.2 3h-3.4l-.4 2a7.6 7.6 0 00-2.6 1.5l-1.9-.7-1.7 3 1.5 1.2a7.6 7.6 0 000 3l-1.5 1.2 1.7 3 1.9-.7a7.6 7.6 0 002.6 1.5l.4 2h3.4l.4-2a7.6 7.6 0 002.6-1.5l1.9.7 1.7-3-1.5-1.2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <span>Server</span>
+  </button>
+</nav>
+
+<!-- ── RESULT SHEET ─────────────────────────────────────────── -->
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-backdrop" data-close-sheet></div>
+  <article class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-grab" data-close-sheet></div>
+    <div class="sheet-media">
+      <img id="sheetImg" alt="Annotated crack scan" />
+      <div class="sev-badge" id="sheetSev">—</div>
+    </div>
+    <div class="sheet-body">
+      <div class="sheet-title-row">
+        <h2 id="sheetTitle">Scan result</h2>
+        <span class="wall-badge" id="sheetWall" hidden>BRICK WALL</span>
+      </div>
+      <p class="sheet-sub" id="sheetSub">—</p>
+
+      <div class="metrics">
+        <div class="metric"><span>Length</span><strong id="mLength">—</strong></div>
+        <div class="metric"><span>Width</span><strong id="mWidth">—</strong></div>
+        <div class="metric"><span>Cracks</span><strong id="mCount">—</strong></div>
+      </div>
+
+      <div class="sheet-actions" id="sheetActions">
+        <button class="btn btn-primary" id="btnNewScan" type="button">New scan</button>
+        <button class="btn btn-quiet" id="btnDeleteScan" type="button">Delete</button>
+      </div>
+
+      <div class="inspect" id="inspectRow">
+        <span class="inspect-label">Inspection</span>
+        <div class="inspect-btns">
+          <button class="chip" data-insp="confirmed" type="button">Confirmed</button>
+          <button class="chip" data-insp="under_repair" type="button">Under repair</button>
+          <button class="chip" data-insp="repaired" type="button">Repaired</button>
+        </div>
+      </div>
+    </div>
+  </article>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

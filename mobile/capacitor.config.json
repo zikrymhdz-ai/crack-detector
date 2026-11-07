@@ -1,0 +1,17 @@
+{
+  "appId": "com.crackscan.app",
+  "appName": "CrackScan",
+  "webDir": "www",
+  "server": {
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#eef4fb"
+  },
+  "plugins": {
+    "Camera": {
+      "presentationStyle": "fullscreen"
+    }
+  }
+}

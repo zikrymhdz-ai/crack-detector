@@ -35,6 +35,10 @@ os.environ.setdefault('OPENCV_FFMPEG_CAPTURE_OPTIONS', 'rtsp_transport;tcp')
 
 app = Flask(__name__)
 
+# Shown on the mobile app's connect screen and in /api/mobile/health so the
+# phone can tell whether it is talking to a server that supports the mobile API.
+APP_VERSION = '2.2.0'
+
 # Socket.IO push channel for the Unity VR digital twin.
 # The Unity client (CrackRealtimeClient.cs) connects with a PLAIN RFC 6455
 # WebSocket (flask-sock) and exchanges simple JSON envelopes, so no Socket.IO
@@ -1516,7 +1520,7 @@ def _add_cors_headers(response):
     response.headers.setdefault('Access-Control-Allow-Origin', '*')
     response.headers.setdefault('Access-Control-Allow-Headers', 'Content-Type')
     # PATCH is needed by /api/cracks/<id> for inspection feedback.
-    response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
+    response.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
     return response
 
 # ─────────────────────────────────────────────
@@ -1774,6 +1778,16 @@ def index():
 @app.route('/live')
 def live():
     return render_template('live.html', ai_ready=AI_READY, model_name=MODEL_NAME)
+
+
+# ─────────────────────────────────────────────
+# MOBILE WEB BUILD (same folder the Capacitor app bundles)
+# Open http://<pc-ip>:5000/app/ on a phone to try the app without installing it.
+# ─────────────────────────────────────────────
+@app.route('/app/')
+@app.route('/app/<path:filename>')
+def mobile_web(filename='index.html'):
+    return send_from_directory('mobile/www', filename)
 
 
 # ─────────────────────────────────────────────
@@ -3172,6 +3186,17 @@ def api_cracks():
         if where:
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY timestamp DESC, id DESC"
+        # Optional paging for the mobile history list (0 = all, the default the
+        # Unity client relies on). `images=0` skips the inline base64 payload so a
+        # 50-row list stays small over mobile data.
+        limit_raw = request.args.get('limit')
+        if limit_raw:
+            try:
+                limit_i = max(1, min(500, int(limit_raw)))
+                sql += f" LIMIT {limit_i}"
+            except ValueError:
+                pass
+        include_images = (request.args.get('images', '1') not in ('0', 'false', 'False'))
         records = conn.execute(sql, params).fetchall()
         conn.close()
 
@@ -3206,12 +3231,191 @@ def api_cracks():
                 'local_x':         r['local_x'],
                 'local_y':         r['local_y'],
                 'image_url':       f"{base}/{img}" if img else '',
-                'image_base64':    _image_base64(r['image_path']),   # convenience for VR
+                'image_base64':    _image_base64(r['image_path']) if include_images else '',   # convenience for VR
             })
 
         return jsonify({'cracks': cracks})
     except Exception as e:
         return jsonify({'cracks': [], 'error': str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# MOBILE APP API (Capacitor client in ./mobile)
+# ─────────────────────────────────────────────
+def _mobile_preview_b64(img_bgr, max_side=1400, quality=82):
+    """JPEG data URI small enough to ship through a JSON response to a phone."""
+    try:
+        if img_bgr is None or img_bgr.size == 0:
+            return ''
+        h, w = img_bgr.shape[:2]
+        if max(h, w) > max_side:
+            s = max_side / float(max(h, w))
+            img_bgr = cv2.resize(img_bgr, (max(1, int(w * s)), max(1, int(h * s))),
+                                 interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode('.jpg', img_bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not ok:
+            return ''
+        return 'data:image/jpeg;base64,' + base64.b64encode(buf.tobytes()).decode('ascii')
+    except Exception:
+        return ''
+
+
+@app.route('/api/mobile/health', methods=['GET'])
+def mobile_health():
+    """Tiny handshake the app runs on its connect screen.
+
+    Deliberately cheap: no inference, no DB, so it answers in milliseconds even
+    while a scan is running.
+    """
+    from flask import jsonify
+    return jsonify({
+        'ok': True,
+        'app': 'CrackScan',
+        'version': APP_VERSION,
+        'model': MODEL_NAME,
+        'ai_ready': bool(model is not None or AI_READY),
+        'masonry': True,
+        'crack_api': True,
+        'server_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'host': request.host,
+    })
+
+
+@app.route('/api/mobile/scan', methods=['POST'])
+def mobile_scan():
+    """Analyse one photo from the mobile app and store it in history.
+
+    Accepts either multipart/form-data (`image` = file) or JSON
+    ({"image": "data:image/jpeg;base64,..."}). The record is written to the same
+    `cracks` table the website, the history page and the Unity VR twin use, so a
+    scan from the phone shows up in the headset immediately.
+
+    Returns the annotated picture as a data URI (capped at 1400 px so the JSON
+    stays phone-sized) plus the absolute URL of the full-resolution result.
+    """
+    from flask import jsonify
+    import re as _re
+
+    os.makedirs('uploads', exist_ok=True)
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    filename = f"mobile_{stamp}.jpg"
+    img_path = f'uploads/{filename}'
+
+    try:
+        if 'image' in request.files:
+            f = request.files['image']
+            ext = os.path.splitext(f.filename or '')[1].lower()
+            if ext not in IMAGE_EXTS | VIDEO_EXTS:
+                ext = '.jpg'
+            filename = f"mobile_{stamp}{ext}"
+            img_path = f'uploads/{filename}'
+            f.save(img_path)
+        else:
+            data = request.get_json(silent=True) or {}
+            uri = data.get('image') or ''
+            if not uri:
+                return jsonify({'ok': False, 'error': 'no image supplied'}), 400
+            if uri.startswith('data:'):
+                head, b64 = uri.split(',', 1)
+                m = _re.search(r'data:[\w/+.-]+/(\w+)', head)
+                ext = '.' + (m.group(1).lower() if m else 'jpg')
+                if ext in ('.jpeg', '.jpe'):
+                    ext = '.jpg'
+            else:
+                b64 = uri
+                ext = '.jpg'
+            try:
+                raw = base64.b64decode(b64, validate=False)
+            except Exception:
+                return jsonify({'ok': False, 'error': 'bad base64 image'}), 400
+            if not raw:
+                return jsonify({'ok': False, 'error': 'empty image'}), 400
+            filename = f"mobile_{stamp}{ext}"
+            img_path = f'uploads/{filename}'
+            with open(img_path, 'wb') as fh:
+                fh.write(raw)
+
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in VIDEO_EXTS:
+            result_img, level, total_length, avg_width, status, cracks = analyze_video(img_path)
+        else:
+            result_img, level, total_length, avg_width, status, cracks = analyze_image(img_path)
+
+        if result_img is None:
+            return jsonify({'ok': False, 'error': 'could not read that image'}), 400
+
+        has_alpha = result_img.ndim == 3 and result_img.shape[2] == 4
+        out_ext = '.png' if has_alpha else '.jpg'
+        out_name = f"annotated_{os.path.splitext(os.path.basename(filename))[0]}{out_ext}"
+        out_path = f'uploads/{out_name}'
+        cv2.imwrite(out_path, result_img)
+
+        # Brick / block wall? Recomputed here (cheap) so the app can label the
+        # result without a second round trip.
+        masonry = {'detected': False, 'pitch': 0}
+        try:
+            probe = cv2.imread(img_path, cv2.IMREAD_COLOR)
+            if probe is not None:
+                masonry = _masonry_profile(cv2.cvtColor(probe, cv2.COLOR_BGR2GRAY))
+        except Exception as e:
+            print(f'mobile masonry probe error: {e}')
+
+        record_id = None
+        try:
+            conn = get_db()
+            cur = conn.execute(
+                "INSERT INTO cracks (image_path, crack_level, crack_area, crack_width, timestamp,"
+                "                      status, confidence)"
+                " VALUES (?,?,?,?,?,'pending',?)",
+                (out_path, level, total_length, round(avg_width, 1),
+                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'), None)
+            )
+            conn.commit()
+            record_id = cur.lastrowid
+            conn.close()
+            emit_saved_crack(record_id, level, total_length, out_path)
+        except Exception as e:
+            print(f'mobile DB write error: {e}')
+
+        preview = result_img[:, :, :3] if has_alpha else result_img
+        base = _image_base()
+        return jsonify({
+            'ok': True,
+            'id': record_id,
+            'level': level,
+            'status': status,
+            'cracks': cracks,
+            'crack_length_px': int(round(total_length)),
+            'crack_width_px': round(float(avg_width), 1),
+            'length_cm': round(float(total_length) * CM_PER_PX, 2),
+            'width_cm': round(float(avg_width) * CM_PER_PX, 2),
+            'masonry': bool(masonry.get('detected')),
+            'wall_type': 'brick' if masonry.get('detected') else 'plain',
+            'joint_pitch_px': masonry.get('pitch') or 0,
+            'image_url': f"{base}/{out_path.lstrip('/')}",
+            'annotated_image': _mobile_preview_b64(preview),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'version': APP_VERSION,
+        })
+    except Exception as e:
+        print(f'mobile scan error: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/mobile/records/<int:record_id>', methods=['DELETE', 'OPTIONS'])
+def mobile_delete_record(record_id):
+    """Delete a scan from history (the phone's swipe action)."""
+    from flask import jsonify
+    if request.method == 'OPTIONS':
+        return ('', 204)
+    try:
+        conn = get_db()
+        conn.execute('DELETE FROM cracks WHERE id = ?', (record_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True, 'deleted': record_id})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/cracks/<int:record_id>/position', methods=['POST'])

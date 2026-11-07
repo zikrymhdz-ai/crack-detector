@@ -71,6 +71,36 @@ Roboflow path. Training helpers live in `scripts/` (`train_fine.py`,
 | `/history` | GET | Inspection history page |
 | `/feedback`, `/retrain` | POST | Capture corrections, fine-tune hook |
 
+## Mobile app (Capacitor)
+
+`mobile/` contains an Android app built with [Capacitor](https://capacitorjs.com)
+around the same UI the server renders at `/app/`. The phone captures photos or a
+live camera preview and the **server** does the detection, so the model never has
+to run on the device.
+
+* **Scan** – live preview with the crack drawn on top, shutter to analyse the
+  current frame, gallery / long-press for a full-resolution photo.
+* **History** – every saved scan from the server, filterable by inspection status,
+  with confirm / under-repair / repaired actions.
+* **Server** – LAN address of the PC, connection test, model + version info.
+
+Build and run instructions: [`mobile/README.md`](mobile/README.md).
+
+```
+cd mobile && npm install
+npx cap sync android
+cd android && .\gradlew.bat assembleDebug    # needs JDK 23 + Android SDK
+```
+
+### Mobile API
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/mobile/health` | GET | handshake: app version, model, masonry support |
+| `/api/mobile/scan` | POST | analyse + store a photo (multipart `image` or JSON base64) |
+| `/api/mobile/records/<id>` | DELETE | remove a scan |
+| `/app/` | GET | the mobile web build, for testing in a phone browser |
+
 ## Accuracy notes
 
 Detection is the model plus a measurement stage that rejects coin-sized
@@ -110,6 +140,7 @@ aruco_locator.py      ArUco marker helpers
 make_aruco_markers.py marker sheet generator
 templates/            upload, live, result, history pages
 scripts/              training, dataset building and evaluation helpers
+mobile/               Capacitor Android app (see mobile/README.md)
 feedback_train/       small feedback dataset used by /retrain
 eval_set.json         labelled evaluation set
 ```
