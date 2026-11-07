@@ -86,6 +86,12 @@ to run on the device.
 
 Build and run instructions: [`mobile/README.md`](mobile/README.md).
 
+<p>
+<img src="docs/screenshots/scan-result.png" width="250" alt="Scan result with brick wall detected" />
+<img src="docs/screenshots/history.png" width="250" alt="Inspection history" />
+<img src="docs/screenshots/server.png" width="250" alt="Server settings" />
+</p>
+
 ```
 cd mobile && npm install
 npx cap sync android
@@ -115,8 +121,10 @@ speckle, filled blobs, brick texture and mortar joints:
   and a dark brick wall;
 * long straight runs are erased (mortar joints, tile edges) **unless** they are
   genuinely dark — a straight settlement crack survives;
-* on masonry, only strokes that repeat along the detected joint grid are dropped,
-  and only when several of them do (one straight crack is not a grid).
+* on masonry, a stroke is dropped only when it lies **on the detected mortar
+  joints** (brick outlines and joints) or repeats along the joint grid, and only
+  when several strokes do — one real crack on a brick wall is never removed just
+  because the wall is gridded;
 
 ### Evaluation harness
 

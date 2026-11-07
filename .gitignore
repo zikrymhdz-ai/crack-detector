@@ -25,9 +25,13 @@ uploads/
 eval_after*.csv
 eval_after*_sheet.jpg
 *.cache
+dist/
 
 # ── OS / editor ───────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+
+# browser automation snapshots
+.playwright-mcp/

@@ -604,11 +604,25 @@ def _masonry_profile(gray):
                 return prof                        # "gaps" are not joints
 
         detected = bool(gaps.size >= 3 and regular <= MASONRY_MAX_PITCH_MAD)
+        # Raster of the mortar joints themselves. A stroke that lies ON it is
+        # wall texture (brick outlines, joints); a crack normally crosses it.
+        joint = np.zeros(gray.shape[:2], np.uint8)
+        if detected:
+            try:
+                thick = int(np.clip((pitch or 12.0) * 0.12, 3, 9))
+                for i in np.where(near1)[0]:
+                    x1, y1, x2, y2 = np.asarray(segs).reshape(-1, 4)[i]
+                    cv2.line(joint, (int(x1), int(y1)), (int(x2), int(y2)), 255, thick)
+                joint = cv2.dilate(joint, np.ones((5, 5), np.uint8), 1)
+            except Exception:
+                joint = np.zeros(gray.shape[:2], np.uint8)
+
         prof.update({'detected': detected,
                      'axes': (a1, (a1 + math.pi / 2.0) % math.pi),
                      'pitch': round(pitch, 1),
                      'support': round(support, 3),
-                     'regularity': round(regular, 3)})
+                     'regularity': round(regular, 3),
+                     'joint': joint})
     except Exception as e:
         print(f'masonry profile error: {e}')
     return prof
@@ -666,15 +680,21 @@ def _is_mortar_joint(skel, length, prof):
 def _reject_mortar_joints(candidates, prof):
     """Remove mortar joints from a set of candidate cracks on a masonry wall.
 
-    A brick / block / stone wall produces MANY straight strokes that follow the
-    mortar grid. Requiring the whole set to be "jointy" before dropping anything
-    keeps a single straight crack - the common settlement/diagonal crack on a
-    brick wall - which the old code used to delete together with the joints.
+    A brick / block / stone wall produces MANY strokes that follow the mortar
+    grid - including the outlines of individual bricks, which are neither
+    straight nor axis-aligned and used to survive the geometric test. A stroke is
+    therefore considered "jointy" when most of it lies ON the detected joint
+    raster, or when it is straight, axis-aligned and no longer than a few bricks.
+
+    The decision is taken for the SET: one lone stroke on a wall is a crack even
+    if it happens to follow a joint, so nothing is dropped unless at least three
+    candidates look like joints.
     """
     if not prof or not prof.get('detected') or not candidates:
         return candidates
     axes = prof.get('axes') or ()
     pitch = float(prof.get('pitch') or 0.0)
+    joint = prof.get('joint')
     jointish = []
     for skel, contour, length, width, conf in candidates:
         ang, straight = _line_geometry(skel)
@@ -686,12 +706,17 @@ def _reject_mortar_joints(candidates, prof):
                 if d <= MASONRY_ANGLE_TOL:
                     aligned = True
                     break
-        is_joint = bool(aligned and straight >= 0.86)
-        if is_joint and pitch > 0 and length > MASONRY_MAX_JOINT_FRAC * pitch:
+        on_joint = 0.0
+        if joint is not None and skel is not None and joint.shape[:2] == skel.shape[:2]:
+            ys, xs = np.nonzero(skel)
+            if len(xs):
+                on_joint = float((joint[ys, xs] > 0).mean())
+        is_joint = on_joint >= 0.55 or (aligned and straight >= 0.86)
+        if is_joint and pitch > 0 and length > MASONRY_MAX_JOINT_FRAC * pitch and on_joint < 0.55:
             is_joint = False
         jointish.append(is_joint)
     if sum(jointish) < 3:
-        return candidates            # 1-2 straight strokes: a crack, not a grid
+        return candidates            # 1-2 strokes: a crack, not a grid
     return [c for c, is_joint in zip(candidates, jointish) if not is_joint]
 
 def _draw_wall_tag(img, prof, prefix='WALL'):
