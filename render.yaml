@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: crackscan
+    env: python
+    buildCommand: pip install -r requirements.txt && python download_model.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT

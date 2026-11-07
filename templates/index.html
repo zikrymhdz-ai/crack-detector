@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrackScan — Wall Crack Detector</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --panel: #f3f7fc;
+            --panel2: #e9f0f9;
+            --border: #cfdcec;
+            --accent: #2563eb;
+            --accent2: #1e3a8a;
+            --warn: #2563eb;
+            --minor: #3b82f6;
+            --safe: #60a5fa;
+            --text: #1e293b;
+            --dim: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Exo 2', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+        }
+
+        .logo {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.6em;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+            .logo span {
+                color: var(--accent2);
+            }
+
+        .header-time {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85em;
+            color: var(--dim);
+        }
+
+        .header-badge {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.72em;
+            letter-spacing: 2px;
+            color: var(--dim);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        /* ── PAGE BODY ── */
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            text-align: center;
+            margin-bottom: 56px;
+            position: relative;
+        }
+
+        .hero-eyebrow {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7em;
+            letter-spacing: 4px;
+            color: var(--dim);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .hero-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: clamp(2.8em, 6vw, 4.8em);
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+            .hero-title span {
+                color: var(--accent);
+            }
+
+        .hero-sub {
+            font-size: 0.95em;
+            color: var(--dim);
+            letter-spacing: 1px;
+            margin-top: 14px;
+        }
+
+        .hero-line {
+            width: 120px;
+            height: 2px;
+            background: var(--accent);
+            margin: 20px auto 0;
+            opacity: 0.5;
+        }
+
+        /* ── PANEL LABEL ── */
+        .panel-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.65em;
+            letter-spacing: 3px;
+            color: var(--dim);
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        /* ── UPLOAD CARDS ── */
+        .upload-section {
+            margin-bottom: 56px;
+        }
+
+        .card-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        @media (max-width: 600px) {
+            .card-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .action-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 28px 26px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .action-card::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 3px;
+                border-radius: 2px;
+                background: var(--border);
+                transition: background 0.2s;
+            }
+
+            .action-card:hover {
+                border-color: var(--accent);
+                background: rgba(37,99,235,0.04);
+            }
+
+                .action-card:hover::before {
+                    background: var(--accent);
+                }
+
+            .action-card.red:hover {
+                border-color: var(--accent2);
+                background: rgba(30,58,138,0.04);
+            }
+
+                .action-card.red:hover::before {
+                    background: var(--accent2);
+                }
+
+        .card-icon {
+            font-size: 1.8em;
+            line-height: 1;
+        }
+
+        .card-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.3em;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .card-desc {
+            font-size: 0.8em;
+            color: var(--dim);
+            line-height: 1.5;
+        }
+
+        .card-tag {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.62em;
+            letter-spacing: 2px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            color: var(--dim);
+            margin-top: auto;
+        }
+
+        .action-card:hover .card-tag {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .action-card.red:hover .card-tag {
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+
+        /* hidden file input */
+        #imageUpload {
+            display: none;
+        }
+
+        /* ── STATS ROW ── */
+        .stats-section {
+            margin-bottom: 56px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 500px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 580px) {
+            .page {
+                padding: 24px 14px 60px;
+            }
+
+            .hero {
+                margin-bottom: 32px;
+            }
+
+            .hero-title {
+                font-size: 2em;
+            }
+
+            .action-card {
+                padding: 20px 18px;
+            }
+
+            .header {
+                padding: 8px 12px;
+            }
+
+            .logo {
+                font-size: 1.2em;
+            }
+
+            .header-badge {
+                font-size: 0.6em;
+                padding: 3px 10px;
+            }
+
+            .history-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .page {
+                padding: 16px 10px 40px;
+            }
+
+            .hero-title {
+                font-size: 1.6em;
+            }
+
+            .action-card {
+                padding: 16px 14px;
+            }
+
+            .card-icon {
+                font-size: 1.4em;
+            }
+
+            .card-title {
+                font-size: 1em;
+            }
+        }
+
+        .stat-tile {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 22px 18px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 2em;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.62em;
+            letter-spacing: 3px;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+
+        /* ── HISTORY ── */
+        .history-section {
+            margin-bottom: 56px;
+        }
+
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .history-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+            .history-card:hover {
+                border-color: var(--accent);
+            }
+
+        .history-img {
+            width: 100%;
+            height: 130px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .history-body {
+            padding: 14px;
+        }
+
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .level-0 {
+            background: rgba(96,165,250,0.12);
+            color: var(--safe);
+            border: 1px solid rgba(96,165,250,0.3);
+        }
+
+        .level-1 {
+            background: rgba(59,130,246,0.1);
+            color: var(--minor);
+            border: 1px solid rgba(59,130,246,0.25);
+        }
+
+        .level-2 {
+            background: rgba(37,99,235,0.1);
+            color: var(--warn);
+            border: 1px solid rgba(37,99,235,0.25);
+        }
+
+        .level-3 {
+            background: rgba(30,58,138,0.1);
+            color: var(--accent2);
+            border: 1px solid rgba(30,58,138,0.25);
+        }
+
+        .history-meta {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68em;
+            color: var(--dim);
+        }
+
+        /* ── NAV LINKS ── */
+        .nav-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--dim);
+            font-family: 'Exo 2', sans-serif;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+            .nav-link:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+        /* ── DIVIDER ── */
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── HEADER ── -->
+    <header class="header">
+        <div class="logo">Crack<span>Scan</span></div>
+        <div class="header-badge">AI DETECTION</div>
+        <div class="header-time" id="clock">--:--:--</div>
+    </header>
+
+    <!-- ── PAGE ── -->
+    <div class="page">
+
+        <!-- HERO -->
+        <div class="hero">
+            <div class="hero-eyebrow">Structural Analysis System</div>
+            <div class="hero-title">Wall <span>Crack</span> Detector</div>
+            <div class="hero-sub">Upload a photo or start live detection — AI Detection</div>
+            <div class="hero-line"></div>
+        </div>
+
+        <!-- UPLOAD -->
+        <div class="upload-section">
+            <div class="panel-label">Start Analysis</div>
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                <div class="card-row">
+
+                    <!-- Gallery Upload -->
+                    <label for="imageUpload" class="action-card">
+                        <div class="card-icon">📱</div>
+                        <div class="card-title">Gallery Upload</div>
+                        <div class="card-desc">Choose a photo or video from your device for AI crack analysis</div>
+                        <div class="card-tag">STATIC ANALYSIS</div>
+                    </label>
+                    <input type="file" id="imageUpload" name="image" accept="image/*,video/*">
+
+                    <!-- Live Camera -->
+                    <a href="/live" class="action-card red">
+                        <div class="card-icon">📹</div>
+                        <div class="card-title">Live Detection</div>
+                        <div class="card-desc">Real-time camera</div>
+                        <div class="card-tag">LIVE · RGB · THERMAL</div>
+                    </a>
+
+                </div>
+            </form>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- HISTORY -->
+        {% if history %}
+        <div class="history-section">
+            <div class="panel-label">Recent Analysis</div>
+            <div class="history-grid">
+                {% for item in history %}
+                <div class="history-card">
+                    <img src="{{ item.image_url }}" class="history-img" alt="Scan result">
+                    <div class="history-body">
+                        <div class="level-badge level-{{ item.level }}">
+                            LVL {{ item.level }} —
+                            {% if item.level == 0 %}SAFE
+                            {% elif item.level == 1 %}MINOR
+                            {% elif item.level == 2 %}MEDIUM
+                            {% else %}SEVERE{% endif %}
+                        </div>
+                        <div class="history-meta">{{ item.area }}px · {{ item.timestamp }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="divider"></div>
+        {% endif %}
+
+        <!-- NAV -->
+        <div class="nav-row">
+            <a href="/history" class="nav-link">📋 Full History</a>
+            <a href="/live" class="nav-link">🔴 Live Camera</a>
+            <button class="nav-link" id="retrainBtn" onclick="retrainModel()" style="border-color:var(--accent2);color:var(--accent2);background:rgba(30,58,138,.04);cursor:pointer;font-family:'Exo 2',sans-serif">
+                🧠 Retrain AI — <span id="retrainCount">{{ fb_correct }}</span> samples
+            </button>
+        </div>
+        <div id="retrainMsg" style="text-align:center;font-family:'Share Tech Mono',monospace;font-size:.72em;color:var(--dim);padding:12px 0 0;min-height:30px"></div>
+
+    </div>
+
+    <script>
+        // Clock
+        function tick() {
+        document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+        }
+        setInterval(tick, 1000); tick();
+
+        // Auto-submit on file pick
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+        if (e.target.files[0]) document.getElementById('uploadForm').submit();
+        });
+
+        async function retrainModel(){
+            const btn=document.getElementById('retrainBtn');
+            const msg=document.getElementById('retrainMsg');
+            btn.disabled=true;
+            btn.textContent='🧠 Training...';
+            msg.textContent='Fine-tuning with your feedback data — this may take a minute...';
+            try{
+                const r=await fetch('/retrain',{method:'POST'});
+                const d=await r.json();
+                if(d.ok){
+                    msg.textContent='✅ Retrained on '+d.labels+' crack labels! Model updated.';
+                    msg.style.color='var(--safe)';
+                    btn.textContent='🧠 Retrain AI ✓';
+                }else{
+                    msg.textContent='❌ '+d.error;
+                    msg.style.color='var(--accent2)';
+                    btn.disabled=false;
+                    btn.textContent='🧠 Retrain AI';
+                }
+            }catch(e){
+                msg.textContent='❌ Network error';
+                msg.style.color='var(--accent2)';
+                btn.disabled=false;
+                btn.textContent='🧠 Retrain AI';
+            }
+        }
+    </script>
+</body>
+</html>

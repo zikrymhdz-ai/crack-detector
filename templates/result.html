@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrackScan — Analysis Result</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --panel: #f3f7fc;
+            --panel2: #e9f0f9;
+            --border: #cfdcec;
+            --accent: #2563eb;
+            --accent2: #1e3a8a;
+            --warn: #2563eb;
+            --minor: #3b82f6;
+            --safe: #60a5fa;
+            --text: #1e293b;
+            --dim: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Exo 2', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .logo {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.6em;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+            .logo span {
+                color: var(--accent2);
+            }
+
+        .header-badge {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.72em;
+            letter-spacing: 3px;
+            color: var(--dim);
+            border: 1px solid var(--border);
+            padding: 4px 14px;
+            border-radius: 4px;
+        }
+
+        .header-time {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85em;
+            color: var(--dim);
+        }
+
+        /* ── LAYOUT ── */
+        .page {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-rows: auto 1fr;
+            gap: 0;
+            min-height: calc(100vh - 54px);
+        }
+
+        @media (max-width: 900px) {
+            .page {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+
+        @media (max-width: 580px) {
+            .img-panel {
+                padding: 16px;
+            }
+
+            .img-title {
+                font-size: 1.4em;
+            }
+
+            .result-img {
+                max-height: 50vh;
+            }
+
+            .sidebar {
+                padding: 16px 12px;
+            }
+
+            .sev-card-value {
+                font-size: 1.6em;
+            }
+
+            .header {
+                padding: 8px 12px;
+            }
+
+            .logo {
+                font-size: 1.2em;
+            }
+
+            .header-badge {
+                font-size: 0.6em;
+                padding: 3px 10px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .img-panel {
+                padding: 10px;
+            }
+
+            .img-title {
+                font-size: 1.1em;
+            }
+
+            .result-img {
+                max-height: 40vh;
+            }
+
+            .metric-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                padding: 10px 8px;
+            }
+
+            .ctrl-btn {
+                padding: 10px;
+                font-size: 0.8em;
+            }
+        }
+
+        /* ── IMAGE PANEL ── */
+        .img-panel {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            border-right: 1px solid var(--border);
+        }
+
+        .img-title-row {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .img-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 2em;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+            .img-title span {
+                color: var(--accent);
+            }
+
+        /* severity pill next to title */
+        .sev-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 18px;
+            border-radius: 30px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8em;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .sev-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .sev-0 {
+            background: rgba(96,165,250,0.1);
+            color: var(--safe);
+            border: 1px solid rgba(96,165,250,0.3);
+        }
+
+            .sev-0 .sev-dot {
+                background: var(--safe);
+            }
+
+        .sev-1 {
+            background: rgba(59,130,246,0.1);
+            color: var(--minor);
+            border: 1px solid rgba(59,130,246,0.3);
+        }
+
+            .sev-1 .sev-dot {
+                background: var(--minor);
+            }
+
+        .sev-2 {
+            background: rgba(37,99,235,0.1);
+            color: var(--warn);
+            border: 1px solid rgba(37,99,235,0.3);
+        }
+
+            .sev-2 .sev-dot {
+                background: var(--warn);
+            }
+
+        .sev-3 {
+            background: rgba(30,58,138,0.1);
+            color: var(--accent2);
+            border: 1px solid rgba(30,58,138,0.3);
+        }
+
+            .sev-3 .sev-dot {
+                background: var(--accent2);
+            }
+
+        /* Image frame */
+        .img-frame {
+            width: 100%;
+            position: relative;
+            background: #0b1220;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .result-img {
+            width: 100%;
+            max-height: 65vh;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Corner brackets */
+        .corner {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+        }
+
+            .corner.tl {
+                top: 10px;
+                left: 10px;
+                border-top: 2px solid var(--accent);
+                border-left: 2px solid var(--accent);
+            }
+
+            .corner.tr {
+                top: 10px;
+                right: 10px;
+                border-top: 2px solid var(--accent);
+                border-right: 2px solid var(--accent);
+            }
+
+            .corner.bl {
+                bottom: 10px;
+                left: 10px;
+                border-bottom: 2px solid var(--accent);
+                border-left: 2px solid var(--accent);
+            }
+
+            .corner.br {
+                bottom: 10px;
+                right: 10px;
+                border-bottom: 2px solid var(--accent);
+                border-right: 2px solid var(--accent);
+            }
+
+        /* Severity overlay bar at bottom of image */
+        .img-overlay-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 16px;
+            background: linear-gradient(0deg, rgba(11,18,32,0.85) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68em;
+            letter-spacing: 2px;
+            color: #cbd5e1;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            background: var(--panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 28px 20px;
+            gap: 18px;
+            overflow-y: auto;
+        }
+
+        .panel-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.62em;
+            letter-spacing: 3px;
+            color: var(--dim);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        /* Big severity card */
+        .severity-card {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .severity-card::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 4px;
+                border-radius: 2px;
+            }
+
+        .sev-card-0::before {
+            background: var(--safe);
+        }
+
+        .sev-card-1::before {
+            background: var(--minor);
+        }
+
+        .sev-card-2::before {
+            background: var(--warn);
+        }
+
+        .sev-card-3::before {
+            background: var(--accent2);
+        }
+
+        .sev-card-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.6em;
+            letter-spacing: 3px;
+            color: var(--dim);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .sev-card-value {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 2.2em;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .sev-card-sub {
+            font-size: 0.78em;
+            color: var(--dim);
+            line-height: 1.4;
+        }
+
+        .sev-bar-wrap {
+            margin-top: 12px;
+            height: 4px;
+            background: rgba(37,99,235,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .sev-bar {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .sev-bar-0 {
+            width: 5%;
+            background: var(--safe);
+        }
+
+        .sev-bar-1 {
+            width: 33%;
+            background: var(--minor);
+        }
+
+        .sev-bar-2 {
+            width: 66%;
+            background: var(--warn);
+        }
+
+        .sev-bar-3 {
+            width: 100%;
+            background: var(--accent2);
+        }
+
+        /* Metric grid */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .metric {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 12px;
+        }
+
+        .metric-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.58em;
+            letter-spacing: 2px;
+            color: var(--dim);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.35em;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        /* Live-style info rows */
+        .info-card {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px 16px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 34px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.82em;
+        }
+
+            .info-row:last-child {
+                border-bottom: none;
+            }
+
+        .info-row .k {
+            color: var(--dim);
+        }
+
+        .info-row .v {
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Recommendation */
+        .rec-card {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .rec-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8em;
+            line-height: 1.5;
+            color: var(--text);
+        }
+
+            .rec-item:last-child {
+                border-bottom: none;
+                padding-bottom: 0;
+            }
+
+        .rec-icon {
+            font-size: 1em;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Action buttons */
+        .ctrl-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text);
+            font-family: 'Exo 2', sans-serif;
+            font-size: 0.88em;
+            font-weight: 600;
+            text-decoration: none;
+            position: relative;
+        }
+
+            .ctrl-btn::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 3px;
+                border-radius: 2px;
+                background: var(--border);
+                transition: background 0.2s;
+            }
+
+            .ctrl-btn:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+                .ctrl-btn:hover::before {
+                    background: var(--accent);
+                }
+
+            .ctrl-btn.red:hover {
+                border-color: var(--accent2);
+                color: var(--accent2);
+            }
+
+                .ctrl-btn.red:hover::before {
+                    background: var(--accent2);
+                }
+
+        .btn-icon {
+            font-size: 1em;
+        }
+
+        .btn-text {
+            line-height: 1.2;
+        }
+
+        .btn-sub {
+            font-size: 0.7em;
+            color: var(--dim);
+            font-weight: 400;
+        }
+
+        /* ── FEEDBACK ── */
+        .feedback-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .fb-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            cursor: pointer;
+            font-family: 'Exo 2',sans-serif;
+            font-size: .85em;
+            font-weight: 600;
+            color: var(--text);
+            transition: all .2s;
+        }
+
+            .fb-btn:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+                background: rgba(37,99,235,.05);
+            }
+
+            .fb-btn.fb-no:hover {
+                border-color: var(--accent2);
+                color: var(--accent2);
+                background: rgba(30,58,138,.05);
+            }
+
+            .fb-btn:disabled {
+                opacity: .4;
+                cursor: default;
+                pointer-events: none;
+            }
+
+        .fb-icon {
+            font-size: 1.1em;
+        }
+
+        .fb-msg {
+            font-family: 'Share Tech Mono',monospace;
+            font-size: .7em;
+            color: var(--safe);
+            text-align: center;
+            padding: 4px 0;
+            min-height: 22px;
+        }
+
+        .fb-msg.err {
+            color: var(--accent2);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+        <a href="/" class="logo">Crack<span>Scan</span></a>
+        <div class="header-badge">ANALYSIS COMPLETE</div>
+        <div class="header-time" id="clock">--:--:--</div>
+    </header>
+
+    <!-- PAGE GRID -->
+    <div class="page">
+
+        <!-- LEFT: IMAGE -->
+        <div class="img-panel">
+            <div class="img-title-row">
+                <div class="img-title"><span>Analysis</span> Result</div>
+                <div class="sev-pill sev-{{ level }}">
+                    <div class="sev-dot"></div>
+                    {% if level == 0 %}SAFE
+                    {% elif level == 1 %}MINOR
+                    {% elif level == 2 %}MEDIUM
+                    {% else %}SEVERE{% endif %}
+                </div>
+            </div>
+
+            <div class="img-frame">
+                <img src="{{ img }}" class="result-img" alt="Crack Analysis Result">
+                <div class="corner tl"></div>
+                <div class="corner tr"></div>
+                <div class="corner bl"></div>
+                <div class="corner br"></div>
+                <div class="img-overlay-bar">
+                    <span>AI DETECTION</span>
+                    <span id="scanTime">—</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: SIDEBAR -->
+        <aside class="sidebar">
+
+            <!-- Severity card -->
+            <div class="panel-label">Severity</div>
+            <div class="severity-card sev-card-{{ level }}">
+                <div class="sev-card-label">Status</div>
+                <div class="sev-card-value" style="color:
+                {% if level == 0 %}var(--safe)
+                {% elif level == 1 %}var(--minor)
+                {% elif level == 2 %}var(--warn)
+                {% else %}var(--accent2){% endif %}">
+                    {% if level == 0 %}SAFE
+                    {% elif level == 1 %}MINOR
+                    {% elif level == 2 %}MEDIUM
+                    {% else %}SEVERE{% endif %}
+                </div>
+                <div class="sev-card-sub">
+                    {% if level == 0 %}No significant cracks detected
+                    {% elif level == 1 %}Hairline crack — monitor periodically
+                    {% elif level == 2 %}Moderate crack — inspection advised
+                    {% else %}Structural concern — immediate action required{% endif %}
+                </div>
+                <div class="sev-bar-wrap"><div class="sev-bar sev-bar-{{ level }}"></div></div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="panel-label">Measurements</div>
+            <div class="metric-grid">
+                <div class="metric">
+                    <div class="metric-label">Crack Level</div>
+                    <div class="metric-value">{{ level }} / 3</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- AI Line (same info as live page) -->
+            <div class="panel-label">AI Line</div>
+            <div class="info-card">
+                <div class="info-row"><span class="k">Cracks</span><span class="v">{{ cracks }}</span></div>
+                <div class="info-row"><span class="k">Length</span><span class="v">{{ area }} px</span></div>
+                <div class="info-row"><span class="k">Width</span><span class="v">{{ width }} px</span></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Actions -->
+            <div class="panel-label">Actions</div>
+
+            <a href="/" class="ctrl-btn">
+                <span class="btn-icon">🔄</span>
+                <span class="btn-text">Scan Another<br><span class="btn-sub">Upload new image</span></span>
+            </a>
+
+            <a href="/history" class="ctrl-btn">
+                <span class="btn-icon">📋</span>
+                <span class="btn-text">View History<br><span class="btn-sub">All past scans</span></span>
+            </a>
+
+            <a href="/live" class="ctrl-btn red">
+                <span class="btn-icon">🔴</span>
+                <span class="btn-text">Live Detection<br><span class="btn-sub">Real-time camera</span></span>
+            </a>
+
+            <div class="divider"></div>
+            <div class="panel-label">Was this correct?</div>
+            <div class="feedback-row">
+                <button class="fb-btn" id="fbYes" onclick="sendFeedback(1)" title="Crack detected correctly">
+                    <span class="fb-icon">👍</span>
+                    <span class="fb-text">Correct</span>
+                </button>
+                <button class="fb-btn fb-no" id="fbNo" onclick="sendFeedback(0)" title="Detection was wrong">
+                    <span class="fb-icon">👎</span>
+                    <span class="fb-text">Wrong</span>
+                </button>
+            </div>
+            <div id="fbMsg" class="fb-msg"></div>
+
+        </aside>
+    </div>
+
+    <script>
+        function tick() {
+        document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+        }
+        setInterval(tick, 1000); tick();
+        document.getElementById('scanTime').textContent = new Date().toLocaleTimeString('en-GB');
+
+        function sendFeedback(correct){
+            const btnYes=document.getElementById('fbYes');
+            const btnNo=document.getElementById('fbNo');
+            const msg=document.getElementById('fbMsg');
+            btnYes.disabled=true; btnNo.disabled=true;
+            msg.textContent='Saving feedback...';
+            msg.className='fb-msg';
+            fetch('/feedback',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    orig_img:'{{ orig_img }}',
+                    annotated_img:'{{ img }}',
+                    level:{{ level }},
+                    area:{{ area }},
+                    width:{{ width }},
+                    is_correct:correct
+                })
+            }).then(r=>r.json()).then(d=>{
+                if(d.ok){
+                    msg.textContent=correct?'👍 Saved — thank you! This helps improve the AI.':'👎 Saved — feedback noted.';
+                    msg.style.color='var(--safe)';
+                }else{
+                    msg.textContent='Error: '+d.error;
+                    msg.className='fb-msg err';
+                    btnYes.disabled=false; btnNo.disabled=false;
+                }
+            }).catch(e=>{
+                msg.textContent='Network error';
+                msg.className='fb-msg err';
+                btnYes.disabled=false; btnNo.disabled=false;
+            });
+        }
+    </script>
+</body>
+</html>

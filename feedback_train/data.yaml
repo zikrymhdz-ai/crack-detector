@@ -1,0 +1,6 @@
+names:
+- crack
+nc: 1
+path: C:\Users\Muhammad Zikry\Desktop\crack_detector\feedback_train
+train: images
+val: images

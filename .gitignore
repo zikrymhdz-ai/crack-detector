@@ -1,0 +1,33 @@
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ── Model weights ─────────────────────────────────────────────────
+# Large .pt checkpoints are not versioned here (crack_fine.pt is ~95 MB).
+# See README.md for how to obtain / retrain them.
+*.pt
+*.onnx
+*.engine
+
+# ── Runtime data ──────────────────────────────────────────────────
+# Uploaded inspection photos (people, rooms, crack captures) stay local.
+uploads/
+*.db
+*.db.*
+*.sqlite3
+
+# ── Local evaluation scratch ──────────────────────────────────────
+.eval_cache/
+eval_after*.csv
+eval_after*_sheet.jpg
+*.cache
+
+# ── OS / editor ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

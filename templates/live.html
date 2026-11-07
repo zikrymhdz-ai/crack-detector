@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrackScan — Live Cameras</title>
+    <style>
+        :root {
+            --bg: #eef4fb;
+            --bg2: #f6faff;
+            --accent: #1e6fff;
+            --accent-soft: rgba(30, 111, 255, 0.10);
+            --accent2: #ff4d4f;
+            --warn: #ffaa00;
+            --safe: #00b34a;
+            --minor: #7ab800;
+            --text: #17283d;
+            --muted: #5a7087;
+            --border: #d7e2f0;
+            --card: rgba(255, 255, 255, 0.80);
+
+            /* consistent scale — everything below uses these */
+            --r-sm: 8px;
+            --r-md: 12px;
+            --r-lg: 16px;
+            --pill: 999px;
+            --edge: 16px;          /* distance from screen edges */
+            --gap: 12px;
+            --bar-h: 44px;         /* status bar height */
+            --pill-h: 36px;        /* every top/bottom pill button */
+            --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+            --dur: 0.22s;
+            --shadow: 0 8px 24px rgba(23, 60, 120, 0.10);
+            --shadow-lg: 0 12px 36px rgba(23, 60, 120, 0.16);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--bg2) 0%, var(--bg) 60%, #e3edfa 100%);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button, a {
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:focus-visible,
+        a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ── STAGE: two cameras side by side, full bleed ── */
+        .stage {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            background: #000;
+        }
+
+        .cam-box {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            overflow: hidden;
+            cursor: zoom-in;
+        }
+
+        .cam-box + .cam-box {
+            border-left: 1px solid rgba(255, 255, 255, 0.9);
+        }
+
+        .cam-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+            display: block;
+        }
+
+        /* AI DETECTION OVERLAY — drawn on top of the RGB feed only.
+           Thermal is never AI-analyzed, so it gets no canvas. */
+        #aiOverlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cam-tag {
+            position: absolute;
+            top: var(--edge);
+            left: var(--edge);
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            height: 28px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            border-radius: var(--pill);
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            color: var(--accent);
+            pointer-events: none;
+        }
+
+        .cam-box.thermal .cam-tag {
+            color: #e2630a;
+            border-color: rgba(226, 99, 10, 0.35);
+        }
+
+        .fs-btn {
+            position: absolute;
+            bottom: calc(var(--bar-h) + var(--edge));
+            left: var(--edge);
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: var(--r-sm);
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(8px);
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+        }
+
+        .fs-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: #fff;
+        }
+
+        .cam-box.thermal .fs-btn:hover {
+            color: #e2630a;
+            border-color: #e2630a;
+        }
+
+        .offline {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            display: none;
+        }
+
+        .cam-box.offline .offline {
+            display: flex;
+        }
+
+        .offline-msg {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(13, 22, 34, 0.94);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #8fa7bd;
+            text-align: center;
+        }
+
+        /* ── FLOATING CONTROL DOCK — bottom-center ── */
+        .controls {
+            position: absolute;
+            left: 50%;
+            bottom: calc(var(--bar-h) + var(--gap));
+            transform: translateX(-50%);
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: var(--r-lg);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            pointer-events: auto;
+            transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+        }
+
+        .controls.hidden {
+            opacity: 0;
+            transform: translateX(-50%) translateY(16px);
+            pointer-events: none;
+        }
+
+        /* controls toggle pill */
+        .controls-toggle {
+            position: absolute;
+            left: 50%;
+            bottom: calc((var(--bar-h) - 32px) / 2);
+            transform: translateX(-50%);
+            z-index: 32;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
+            padding: 0 16px;
+            border-radius: var(--pill);
+            border: 1px solid var(--border);
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(23, 60, 120, 0.08);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+        }
+
+        .controls-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 4px 12px rgba(30, 111, 255, 0.14);
+        }
+
+        /* ── SIDE INFO PANEL (toggleable) ── */
+        .info-panel {
+            position: absolute;
+            right: var(--edge);
+            top: calc(var(--edge) + var(--pill-h) + var(--gap));
+            bottom: calc(var(--bar-h) + var(--gap));
+            width: 296px;
+            z-index: 28;
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+            padding: var(--gap);
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: var(--r-lg);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            overflow-y: auto;
+            transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+            opacity: 1;
+        }
+
+        .info-panel.hidden {
+            transform: translateX(340px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .info-card {
+            flex-shrink: 0;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
+            padding: 12px 16px;
+        }
+
+        .info-card h3 {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 36px;
+            border-bottom: 1px solid #e9f0f9;
+            font-size: 13px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-row .k {
+            color: var(--muted);
+        }
+
+        .info-row .v {
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* detection-freshness readout: amber when an AI pass is slower than the poll */
+        .info-row .v.warn {
+            color: #d98a00;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .sev-badge {
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 10px;
+            border-radius: var(--pill);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+        }
+
+        .sev-safe   { background: rgba(0,179,74,0.12); color: var(--safe);   border: 1px solid rgba(0,179,74,0.35); }
+        .sev-minor  { background: rgba(122,184,0,0.12); color: var(--minor); border: 1px solid rgba(122,184,0,0.35); }
+        .sev-medium { background: rgba(255,170,0,0.14); color: #d98a00;      border: 1px solid rgba(255,170,0,0.45); }
+        .sev-severe { background: rgba(255,77,79,0.12); color: var(--accent2); border: 1px solid rgba(255,77,79,0.35); }
+        .sev-off    { background: #eef2f7; color: var(--muted);              border: 1px solid var(--border); }
+
+        .temp-label {
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .temp-hot { color: var(--accent2); }
+        .temp-cold { color: var(--accent); }
+
+        .info-toggle-btn {
+            position: absolute;
+            right: var(--edge);
+            top: var(--edge);
+            z-index: 32;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: var(--pill-h);
+            padding: 0 16px;
+            border-radius: var(--pill);
+            border: 1px solid var(--border);
+            background: var(--card);
+            backdrop-filter: blur(8px);
+            box-shadow: var(--shadow);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+        }
+
+        .info-toggle-btn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #fff;
+        }
+
+        .info-toggle-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* every dock button is exactly the same size */
+        .ctrl-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            width: 104px;
+            height: 64px;
+            padding: 0 8px;
+            border-radius: var(--r-md);
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.2;
+            text-align: center;
+            text-decoration: none;
+            white-space: nowrap;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(23, 60, 120, 0.06);
+            transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+        }
+
+        .ctrl-btn .ico {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .ctrl-btn .sub {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        .ctrl-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(30, 111, 255, 0.16);
+        }
+
+        .ctrl-btn:active {
+            transform: translateY(0);
+        }
+
+        .ctrl-btn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-soft);
+        }
+        .ctrl-btn.off {
+            border-color: rgba(118, 135, 166, 0.5);
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        .ctrl-btn.warn:hover {
+            border-color: var(--accent2);
+            color: var(--accent2);
+            box-shadow: 0 6px 16px rgba(255, 77, 79, 0.16);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none;
+        }
+
+        /* ── STATUS STRIP ── */
+        .statusbar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 25;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            height: var(--bar-h);
+            padding: 0 var(--edge);
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        .statusbar .it {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .statusbar .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .statusbar .off .dot { background: var(--accent2); }
+        .statusbar .on .dot { background: var(--safe); animation: blink 1.2s ease-in-out infinite; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.25; }
+        }
+
+        /* thin scrollbar for the info panel */
+        .info-panel::-webkit-scrollbar { width: 6px; }
+        .info-panel::-webkit-scrollbar-track { background: transparent; }
+        .info-panel::-webkit-scrollbar-thumb { background: #c6d6ea; border-radius: var(--pill); }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="stage" id="stage">
+
+        <!-- RGB CAMERA -->
+        <div class="cam-box" id="rgbBox">
+            <div class="cam-tag">RGB</div>
+            <button class="fs-btn" title="Toggle fullscreen (double-click too)">⛶</button>
+            <img id="rgbImg" alt="RGB feed">
+            <canvas id="aiOverlay"></canvas>
+            <div class="offline"><div class="offline-msg">RGB — NO SIGNAL</div></div>
+        </div>
+
+        <!-- THERMAL CAMERA -->
+        <div class="cam-box thermal" id="thermalBox">
+            <div class="cam-tag">THERMAL</div>
+            <button class="fs-btn" title="Toggle fullscreen (double-click too)">⛶</button>
+            <img id="thermalImg" alt="Thermal feed">
+            <div class="offline"><div class="offline-msg">THERMAL — NO SIGNAL</div></div>
+        </div>
+    </div>
+
+    <!-- FLOATING CONTROLS -->
+    <div class="controls" id="controls">
+        <button class="ctrl-btn warn" id="btnStop" onclick="stopStream()" disabled>
+            <span class="ico">■</span>
+            Stop Camera
+        </button>
+        <button class="ctrl-btn active" id="btnStart" onclick="startStream()">
+            <span class="ico">▶</span>
+            Start Camera
+        </button>
+        <button class="ctrl-btn" id="btnCapture" onclick="captureFrames()" disabled>
+            <span class="ico">◉</span>
+            Capture
+            <span class="sub">Save to history</span>
+        </button>
+        <button class="ctrl-btn active" id="aiToggle">
+            <span class="ico">◈</span>
+            AI Overlay
+            <span class="sub">RGB only</span>
+        </button>
+        <a class="ctrl-btn" href="/" id="btnHome">
+            <span class="ico">⌂</span>
+            Home
+        </a>
+    </div>
+
+    <!-- CONTROLS TOGGLE -->
+    <button class="controls-toggle" id="controlsToggle" onclick="toggleControls()">⌄ HIDE CONTROLS</button>
+
+    <!-- INFO TOGGLE -->
+    <button class="info-toggle-btn active" id="infoToggle" onclick="toggleInfo()">◫ INFO</button>
+
+    <!-- SIDE INFO PANEL -->
+    <aside class="info-panel" id="infoPanel">
+        <div class="info-card">
+            <h3>Severity</h3>
+            <div class="info-row"><span class="k">Status</span><span class="v"><span class="sev-badge sev-off" id="sevBadge">OFF</span></span></div>
+            <div class="info-row"><span class="k">Level</span><span class="v" id="sevLevel">0 / 3</span></div>
+        </div>
+        <div class="info-card">
+            <h3>AI Line</h3>
+            <div class="info-row"><span class="k">Cracks</span><span class="v" id="aiCracks">0</span></div>
+            <div class="info-row"><span class="k">Length</span><span class="v" id="aiLength">0 px</span></div>
+            <div class="info-row"><span class="k">Width</span><span class="v" id="aiWidth">0 px</span></div>
+            <div class="info-row"><span class="k">Boxes</span><span class="v" id="aiBoxes">0</span></div>
+            <div class="info-row"><span class="k">Detection</span><span class="v" id="aiFresh">starting…</span></div>
+        </div>
+        <div class="info-card">
+            <h3>Temperature</h3>
+            <div class="info-row"><span class="k">Highest</span><span class="v temp-label temp-hot" id="tempMax">—</span></div>
+            <div class="info-row"><span class="k">Lowest</span><span class="v temp-label temp-cold" id="tempMin">—</span></div>
+            <div class="info-row"><span class="k">Center</span><span class="v temp-label" id="tempCenter">—</span></div>
+        </div>
+    </aside>
+
+    <!-- STATUS STRIP -->
+    <div class="statusbar" id="statusbar">
+        <span id="connState" class="off"><span class="dot"></span>STREAM OFF</span>
+        <span style="margin-left:auto">double-click a camera to fullscreen</span>
+    </div>
+
+    <script>
+        // ── STATE ──
+        const rgbImg     = document.getElementById('rgbImg');
+        const thermalImg = document.getElementById('thermalImg');
+        const rgbBox     = document.getElementById('rgbBox');
+        const thermalBox = document.getElementById('thermalBox');
+        const aiCanvas   = document.getElementById('aiOverlay');
+        const aiCtx      = aiCanvas.getContext('2d');
+        let running = false;
+        let latestContours = [];      // newest AI result, redrawn every frame
+        let latestLevel = 0;
+
+        // ── STREAM CONTROL ──
+        function startStream() {
+            running = true;
+            rgbBox.classList.remove('offline');
+            thermalBox.classList.remove('offline');
+            rgbImg.src     = '/vr_rgb_mjpeg';
+            thermalImg.src = '/vr_thermal_mjpeg';
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled  = false;
+            document.getElementById('btnCapture').disabled = false;
+            const st = document.getElementById('connState');
+            st.className = 'on';
+            st.querySelector('.dot');
+            st.innerHTML = '<span class="dot"></span>STREAM LIVE';
+            rgbImg.onerror     = () => rgbBox.classList.add('offline');
+            thermalImg.onerror = () => thermalBox.classList.add('offline');
+            const fix = (img, box) => { img.onload = () => box.classList.remove('offline'); };
+            fix(rgbImg, rgbBox);
+            fix(thermalImg, thermalBox);
+        }
+
+        function stopStream() {
+            running = false;
+            latestContours = [];
+            latestLevel = 0;
+            aiCtx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+            rgbImg.onerror     = null;
+            thermalImg.onerror = null;
+            rgbImg.onload = null;
+            thermalImg.onload = null;
+            rgbImg.removeAttribute('src');
+            thermalImg.removeAttribute('src');
+            rgbBox.classList.remove('offline');
+            thermalBox.classList.remove('offline');
+            document.getElementById('btnStart').disabled   = false;
+            document.getElementById('btnStop').disabled    = true;
+            document.getElementById('btnCapture').disabled = true;
+            document.getElementById('connState').className = 'off';
+            document.getElementById('connState').innerHTML = '<span class="dot"></span>STREAM OFF';
+        }
+
+        // ── CAPTURE → save to history ──
+        // The frame is captured, analysed server-side so the crack line is drawn on it, then
+        // stored with status='pending'. Unity raycasts a world position for it later via
+        // POST /api/cracks/<id>/position.
+
+        let captureBusy = false;
+
+        function frameToBlob(img) {
+            if (!img.naturalWidth) return null;
+            const c = document.createElement('canvas');
+            c.width  = img.naturalWidth;
+            c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            return new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+        }
+
+        async function captureFrames() {
+            if (!running || captureBusy) return;
+
+            // Grab both feeds from the SAME moment. The thermal feed can still be
+            // unavailable (camera offline or not yet warmed up), in which case only
+            // the RGB picture is saved.
+            const rgbBlob = await frameToBlob(rgbImg);
+            if (!rgbBlob) { alert('No RGB frame available yet.'); return; }
+            const thermalBlob = await frameToBlob(thermalImg);
+
+            captureBusy = true;
+            document.getElementById('btnCapture').disabled = true;
+
+            try {
+                const fd = new FormData();
+                fd.append('image', rgbBlob, 'capture_rgb.jpg');
+                if (thermalBlob) fd.append('thermal', thermalBlob, 'capture_thermal.jpg');
+
+                const res = await (await fetch('/save_capture', { method: 'POST', body: fd })).json();
+                if (!res.success) { alert('Save failed: ' + (res.error || 'unknown error')); return; }
+
+                showSavedToast(res);
+            } catch (e) {
+                alert('Capture error: ' + e.message);
+            } finally {
+                captureBusy = false;
+                if (running) document.getElementById('btnCapture').disabled = false;
+            }
+        }
+
+        function showSavedToast(res) {
+            const t = document.getElementById('saveToast');
+            const n = (res.saved || []).length;
+            t.innerHTML =
+                '<b>Saved to history</b><br>' +
+                n + ' picture(s) · ' + (res.saved || [])[0].cracks + ' crack(s) · ' +
+                (res.saved || [])[0].status + '<br>' +
+                (res.saved || []).map(s => s.camera_type).join(' + ') + '<br>' +
+                '<span class="dim">Waiting to be placed in VR</span>';
+            t.style.display = 'block';
+            clearTimeout(t._timer);
+            t._timer = setTimeout(() => { t.style.display = 'none'; }, 6000);
+        }
+
+        // ── FULLSCREEN (button or double-click) ──
+        function toggleFullscreen(box) {
+            const doc = document;
+            if (doc.fullscreenElement) {
+                doc.exitFullscreen && doc.exitFullscreen();
+            } else if (box.requestFullscreen) {
+                box.requestFullscreen();
+            } else if (box.webkitRequestFullscreen) {
+                box.webkitRequestFullscreen();
+            }
+        }
+
+        rgbBox.addEventListener('dblclick',     () => toggleFullscreen(rgbBox));
+        thermalBox.addEventListener('dblclick', () => toggleFullscreen(thermalBox));
+        rgbBox.querySelector('.fs-btn').addEventListener('click',     (e) => { e.stopPropagation(); toggleFullscreen(rgbBox); });
+        thermalBox.querySelector('.fs-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(thermalBox); });
+
+        // ── INFO PANEL TOGGLE ──
+        function toggleInfo() {
+            const panel = document.getElementById('infoPanel');
+            const btn   = document.getElementById('infoToggle');
+            const hidden = panel.classList.toggle('hidden');
+            btn.classList.toggle('active', !hidden);
+        }
+
+        // ── CONTROLS TOGGLE ──
+        function toggleControls() {
+            const dock = document.getElementById('controls');
+            const btn  = document.getElementById('controlsToggle');
+            const hidden = dock.classList.toggle('hidden');
+            btn.textContent = hidden ? '⌃ SHOW CONTROLS' : '⌄ HIDE CONTROLS';
+        }
+
+        // ── LIVE AI + TEMP STATS ──
+        const SEV = {
+            0: { label: 'SAFE',   cls: 'sev-safe' },
+            1: { label: 'MINOR',  cls: 'sev-minor' },
+            2: { label: 'MEDIUM', cls: 'sev-medium' },
+            3: { label: 'SEVERE', cls: 'sev-severe' }
+        };
+
+        // AI detection overlay — RGB ONLY (thermal is never AI-analyzed).
+        // Contours arrive normalized 0..1, so they map onto the letterboxed
+        // image rect exactly, at any stream resolution.
+        const SEV_COLOR = ['#00b34a', '#7ab800', '#ffaa00', '#ff4d4f'];
+        let showAiOverlay = true;
+
+        document.getElementById('aiToggle').addEventListener('click', () => {
+            showAiOverlay = !showAiOverlay;
+            document.getElementById('aiToggle').classList.toggle('off', !showAiOverlay);
+            if (!showAiOverlay) aiCtx.clearRect(0, 0, aiCanvas.width, aiCanvas.height);
+        });
+
+        function aiLetterboxRect() {
+            const box = rgbBox.getBoundingClientRect();
+            const bw = box.width, bh = box.height;
+            const nw = rgbImg.naturalWidth  || 16;
+            const nh = rgbImg.naturalHeight || 9;
+            const boxA = bw / bh, imgA = nw / nh;
+            let w, h;
+            if (imgA > boxA) { w = bw; h = bw / imgA; }   // pillarbox
+            else             { h = bh; w = bh * imgA; }   // letterbox
+            return { x: (bw - w) / 2, y: (bh - h) / 2, w, h };
+        }
+
+        function drawAiOverlay() {
+            const dpr = window.devicePixelRatio || 1;
+            const box = rgbBox.getBoundingClientRect();
+            if (box.width < 2 || box.height < 2) return;
+            if (aiCanvas.width !== Math.round(box.width * dpr) ||
+                aiCanvas.height !== Math.round(box.height * dpr)) {
+                aiCanvas.width  = Math.round(box.width * dpr);
+                aiCanvas.height = Math.round(box.height * dpr);
+            }
+            const ctx = aiCtx;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, box.width, box.height);
+            if (!running || !showAiOverlay || !latestContours.length) return;
+
+            const r = aiLetterboxRect();
+            const color = SEV_COLOR[latestLevel] || SEV_COLOR[0];
+            const lw = Math.max(1.5, r.w / 320);
+
+            ctx.lineJoin = 'round';
+            ctx.lineCap  = 'round';
+            ctx.shadowColor = color;
+            ctx.shadowBlur  = 8;
+
+            for (const c of latestContours) {
+                const pts = c.pts_n || c.points;
+                if (!pts || pts.length < 2) continue;
+                const norm = !!c.pts_n;
+                ctx.beginPath();
+                for (let i = 0; i < pts.length; i++) {
+                    const px = r.x + (norm ? pts[i][0] * r.w : pts[i][0] / 320 * r.w);
+                    const py = r.y + (norm ? pts[i][1] * r.h : pts[i][1] / 240 * r.h);
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lw;
+                ctx.stroke();
+
+                // endpoint dot + length label
+                const [lx, ly] = [ r.x + (norm ? pts[pts.length-1][0] * r.w : pts[pts.length-1][0] / 320 * r.w),
+                                    r.y + (norm ? pts[pts.length-1][1] * r.h : pts[pts.length-1][1] / 240 * r.h) ];
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(lx, ly, lw * 1.8, 0, Math.PI * 2);
+                ctx.fill();
+                if (c.length) {
+                    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+                    const lbl = Math.round(c.length) + 'px';
+                    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+                    ctx.fillRect(lx + 6, ly - 16, ctx.measureText(lbl).width + 8, 16);
+                    ctx.fillStyle = color;
+                    ctx.fillText(lbl, lx + 10, ly - 4);
+                }
+            }
+            ctx.shadowBlur = 0;
+        }
+
+        // redraw on every frame so the overlay tracks resize/fullscreen
+        (function aiLoop() {
+            drawAiOverlay();
+            requestAnimationFrame(aiLoop);
+        })();
+
+        // Detection geometry polls FAST so the overlay tracks the video (server
+        // re-analyzes every ~0.5s). Temperature polls stay slow — each /vr_thermal_temp
+        // call opens a new RTSP session to the camera, so hammering it is wasteful.
+        const AI_POLL_MS = 150;
+        const TEMP_POLL_MS = 2000;
+
+        async function pollAi() {
+            try {
+                const a = await fetch('/live_contours', { cache: 'no-store' });
+                if (a.ok) {
+                    const d = await a.json();
+                    const sev = SEV[d.level] || SEV[0];
+                    const badge = document.getElementById('sevBadge');
+                    badge.textContent = sev.label;
+                    badge.className = 'sev-badge ' + sev.cls;
+                    document.getElementById('sevLevel').textContent = (d.level ?? 0) + ' / 3';
+                    document.getElementById('aiCracks').textContent = d.boxes ?? 0;
+                    document.getElementById('aiLength').textContent = Math.round(d.length || 0) + ' px';
+                    document.getElementById('aiWidth').textContent  = Math.round(d.width || 0) + ' px';
+                    document.getElementById('aiBoxes').textContent  = d.boxes ?? 0;
+                    const stale = (d.age_ms ?? -1) < 0 ||
+                                  d.age_ms > Math.max(1500, (d.analyze_ms ?? 0) * 3);
+                    latestContours = stale ? [] : (d.contours || []);
+                    latestLevel = d.level ?? 0;
+
+                    const ageEl = document.getElementById('aiFresh');
+                    const ms = d.analyze_ms ?? 0;
+                    if (ageEl) {
+                        if ((d.age_ms ?? -1) < 0) {
+                            ageEl.textContent = 'starting…';
+                            ageEl.className = 'v';
+                        } else {
+                            const hz = (d.interval ? (1000 / d.interval) : 2).toFixed(1);
+                            ageEl.textContent = Math.round(d.age_ms) + ' ms old  ·  pass ' + ms + ' ms  ·  ~' + hz + ' Hz';
+                            ageEl.className = 'v' + (d.age_ms > (Math.max(d.interval * 1000, ms) * 1.6 + 200) ? ' warn' : '');
+                        }
+                    }
+                }
+            } catch (e) { latestContours = []; /* server unreachable — don't leave a frozen overlay */ }
+        }
+
+        async function pollTemp() {
+            try {
+                const t = await fetch('/vr_thermal_temp', { cache: 'no-store' });
+                if (t.ok) {
+                    const d = await t.json();
+                    const mk = (v) => (v == null) ? '—' : v.toFixed(1) + ' C';
+                    document.getElementById('tempMax').textContent    = mk(d.max_c);
+                    document.getElementById('tempMin').textContent    = mk(d.min_c);
+                    document.getElementById('tempCenter').textContent = mk(d.temperature_c);
+                } else {
+                    document.getElementById('tempMax').textContent    = '—';
+                    document.getElementById('tempMin').textContent    = '—';
+                    document.getElementById('tempCenter').textContent = '—';
+                }
+            } catch (e) {
+                document.getElementById('tempMax').textContent    = '—';
+                document.getElementById('tempMin').textContent    = '—';
+                document.getElementById('tempCenter').textContent = '—';
+            }
+        }
+
+        pollAi();
+        pollTemp();
+        setInterval(pollAi, AI_POLL_MS);
+        setInterval(pollTemp, TEMP_POLL_MS);
+
+        window.onbeforeunload = () => { if (running) stopStream(); };
+    </script>
+
+    <!-- ── Saved confirmation ── -->
+    <div id="saveToast" style="display:none; position:fixed; right:18px; bottom:18px; z-index:101;
+         background:rgba(10,14,20,.94); color:#e8eef6; border:1px solid rgba(0,220,180,.4);
+         border-radius:10px; padding:12px 16px; font:13px/1.55 ui-sans-serif,system-ui,sans-serif;
+         max-width:340px; box-shadow:0 8px 28px rgba(0,0,0,.5);">
+    </div>
+
+</body>
+</html>

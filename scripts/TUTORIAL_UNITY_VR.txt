@@ -1,0 +1,195 @@
+==============================================================================
+CRACK DETECTOR - UNITY + VR TUTORIAL
+==============================================================================
+This guide explains how to use the Unity room scanner and the VR mode to
+detect cracks in walls, see the crack line drawn in 3D, and save results to
+the website history.
+
+Files you need (already in this project):
+  - app.py                       -> the Python server (start this first)
+  - unity_room_scanner/          -> the Unity project
+  - crack_dataset/               -> sample test images (optional)
+
+==============================================================================
+PART 1 - START THE PYTHON SERVER (required for everything)
+==============================================================================
+
+1. Open a command prompt / terminal.
+
+2. Go to the project folder:
+      cd C:\Users\Muhammad Zikry\Desktop\crack_detector
+
+3. Start the server:
+      python app.py
+
+   You should see something like:
+      * Running on http://0.0.0.0:5000
+
+   KEEP THIS WINDOW OPEN. It must run the whole time you use Unity.
+
+4. (Optional) Quick test - open a browser and go to:
+      http://localhost:5000
+   You should see the website. Stop/restart the server with Ctrl+C in the
+   terminal if you need to.
+
+   To find your PC's LAN IP (needed for a VR headset later):
+      ipconfig
+   Look for "IPv4 Address", usually something like 192.168.1.x.
+   The server is reachable at http://192.168.1.x:5000 from other devices
+   on the same Wi-Fi/network.
+
+==============================================================================
+PART 2 - OPEN THE UNITY PROJECT
+==============================================================================
+
+1. Open Unity Hub -> Open -> select this folder:
+      C:\Users\Muhammad Zikry\Desktop\crack_detector\unity_room_scanner
+
+2. Use Unity 6000.4.10f1 (Unity 6). If Unity asks to import packages, accept.
+   The first open takes a few minutes while packages download
+   (OpenXR, XR Interaction Toolkit, Newtonsoft JSON, etc).
+
+3. The Packages/manifest.json already contains everything needed, so you
+   do NOT need to install packages manually.
+
+==============================================================================
+PART 3 - WEBGAM MODE (no headset needed - quick test)
+==============================================================================
+
+This mode uses your computer webcam and works in the Unity Editor.
+
+1. In Unity: File -> New Scene (or File -> Save As to save one).
+2. In the Hierarchy: right-click -> Create Empty.
+   Name it "RoomScanner".
+3. Select "RoomScanner" -> Add Component -> search "RoomScanner" and add it.
+4. In the Inspector set:
+      Server URL = http://localhost:5000/analyze_live
+   (Leave Camera Index = 0 and resolution as-is for a first test.)
+5. Press the Play button (top toolbar).
+6. Allow the camera permission when asked.
+7. The webcam preview appears. Point it at a wall/surface and press SCAN.
+8. The result shows SAFE / MINOR / MEDIUM / SEVERE, the crack length/width,
+   and the annotated image with the crack drawn on it.
+
+==============================================================================
+PART 4 - VR MODE SETUP (headset required for the VR experience)
+==============================================================================
+
+IMPORTANT: For a first test you can still press Play WITHOUT a headset.
+VRCrackScanner builds a demo room and works with the mouse + Space bar,
+so you can check the whole flow before putting the headset on.
+
+1. In Unity: File -> New Scene.
+2. Add the XR camera rig:
+      Hierarchy right-click -> XR -> XR Origin (VR)
+   If that menu is missing, re-open the project (the XR Interaction Toolkit
+   package may still be importing), or check it is enabled in
+   Package Manager -> XR Interaction Toolkit.
+3. Make sure the XR Origin camera is the "MainCamera":
+      In the Hierarchy expand "XR Origin" -> "Camera Offset" -> "Main Camera".
+      Select "Main Camera" and check the tag is "MainCamera" in the Inspector
+      (it is by default).
+4. Enable OpenXR:
+      Edit -> Project Settings -> XR Plug-in Management
+      Tick "OpenXR" for the platforms you use (Windows/Meta Quest).
+      Then under XR Plug-in Management -> OpenXR -> Interaction Profiles:
+      add your controller profile, e.g.
+        - "Oculus Touch Controller Profile" (for Meta Quest)
+        - "Windows Mixed Reality" (for WMR headsets)
+5. Add the scanner:
+      Hierarchy right-click -> Create Empty, name it "VRCrackScanner".
+      Select it -> Add Component -> "VRCrackScanner".
+6. Set the fields in the Inspector:
+      Analyze URL  = http://localhost:5000/analyze_live
+      Save URL     = http://localhost:5000/vr_scan
+      Build Demo Room = ON   (spawns a room full of fake cracks to scan)
+      Log To Website  = ON   (saves every scan to the website history)
+
+   If you use a headset connected over Wi-Fi instead of USB, replace
+   "localhost" with your PC's LAN IP, e.g.
+      http://192.168.1.10:5000/analyze_live
+      http://192.168.1.10:5000/vr_scan
+
+==============================================================================
+PART 5 - USING THE VR MODE
+==============================================================================
+
+WITHOUT a headset (Editor test):
+  1. Make sure the Python server is running (Part 1).
+  2. Press Play in Unity.
+  3. The demo room appears with procedural cracks on the walls.
+  4. Use the mouse look + WASD to walk (standard Unity controls), or just
+     look around - the camera starts facing a wall.
+  5. Press the SPACE BAR to scan the wall you are looking at.
+  6. Wait a few seconds. The server analyzes the screenshot.
+  7. The status HUD appears in front of you:
+        - Colored label: SAFE (green) / MINOR (yellow) / MEDIUM (orange) /
+          SEVERE (red)
+        - Length, width, number of cracks
+        - The annotated image (what the server saw)
+  8. The crack is drawn on the wall as a magenta 3D line.
+  9. Each scan is logged to the website (if Log To Website is ON).
+
+WITH a headset (Meta Quest / WMR / any OpenXR headset):
+  1. Connect the headset to the PC (link cable / Air Link / Mixed Reality
+     Portal).
+  2. In Unity press Play - the view goes into the headset.
+  3. Walk / teleport around the virtual room.
+  4. Look at a wall with a crack and pull the TRIGGER on either controller
+     (or press A / grip - all of them work).
+  5. The same HUD + 3D magenta crack line appear.
+  6. Move closer / rotate for a different view and scan again.
+
+Build to the headset (optional, for a standalone experience):
+  1. File -> Build Settings -> Android or PC Standalone.
+  2. Switch Platform and enable OpenXR for that platform first
+     (Part 4 step 4).
+  3. Build and run.
+  4. NOTE: On the headset, "localhost" is the headset itself, so use the
+     PC's LAN IP in the URLs (Part 1 step 4).
+
+==============================================================================
+PART 6 - WHERE DO THE RESULTS GO?
+==============================================================================
+
+  - The website shows a history of all crack detections. Open in a browser:
+        http://localhost:5000
+    Scans made with "Log To Website = ON" (VR mode) are inserted into the
+    website history table under uploads/.
+  - Files saved by the server live in:
+        C:\Users\Muhammad Zikry\Desktop\crack_detector\uploads\
+
+==============================================================================
+PART 7 - TROUBLESHOOTING
+==============================================================================
+
+  "No connection / timeout":
+      - Is the Python server running? (Part 1)
+      - Is the URL correct? On the same PC use localhost. On a device/headset
+        use the PC's LAN IP.
+      - Windows Firewall: allow inbound TCP port 5000 for python.exe.
+        (Settings -> Windows Defender Firewall -> Allow an app through...)
+      - Make sure PC and headset/phone are on the SAME network.
+
+  "The line is not drawn on the wall":
+      - The wall must have a collider. The demo room walls have colliders,
+        but if you build your own room add Box Colliders to every wall.
+      - Stand closer / make sure a crack is actually in the frame.
+
+  "Scanner does nothing when I pull the trigger":
+      - Check the XR Interaction Toolkit rig is tagged correctly (Part 4
+        step 3) and OpenXR is enabled (Part 4 step 4).
+      - In the Editor you can always press SPACE to test.
+
+  "Wrong resolution / slow scan":
+      - Lower Capture Width/Height on the VRCrackScanner component
+        (e.g. 640x360). Smaller images scan faster.
+
+  "The demo room is empty / no cracks":
+      - Make sure Build Demo Room is ON and there is a Light in the scene
+        (VRCrackScanner adds one automatically). If the room looks dark,
+        check Lighting -> Scene tab -> Auto Generate.
+
+==============================================================================
+That's it. Happy scanning!
+==============================================================================
